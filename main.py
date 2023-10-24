@@ -26,6 +26,11 @@ def download_article(article_url, article_folder, output_file, stop_flag):
             # Генерируем уникальный идентификатор на основе даты публикации
             article_id = date_published.strftime("%Y-%m-%d_%H-%M-%S")
 
+            # Проверяем, если статья с таким идентификатором уже существует в файле
+            if article_id in open(os.path.join(article_folder, output_file), 'r', encoding='utf-8').read():
+                print(f"Статья {article_url} с датой {article_id} уже добавлена.")
+                return False
+
             # Получаем текст статьи
             article_text = "\n".join([p.get_text() for p in soup.find_all('p')])
 
@@ -52,7 +57,7 @@ def download_article(article_url, article_folder, output_file, stop_flag):
                 file.write(f"Начало статьи ({article_id}):\n")
                 file.write(article_text + '\n')
                 file.write("----------------------------\n")
-
+            print(f"+1 element date = {article_id}")
             return True
         else:
             print(f"Не удалось получить доступ к статье {article_url}")
@@ -78,7 +83,7 @@ os.makedirs(article_folder, exist_ok=True)
 downloaded_dates = []
 
 # Интервал времени в часах между сканированиями
-interval_hours = 1
+interval_hours = 0.1
 
 #Актуальность статьи в часах
 max_age_hours = 12
@@ -99,6 +104,7 @@ while True:
 
             for meta_element in meta_elements:
                 article_url = meta_element['content']
+
                 if not download_article(article_url, article_folder, output_file, Event()):
                     print("Остановка парсинга старых статей.")
                     break  # Если download_article возвращает False, прерываем обработку текущей статьи
