@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import re
 
 # Функция для загрузки статьи и добавления текста в файл с идентификаторами
-# Git without articles
+# Git without articles 2
 def download_article(article_url, article_folder, output_file):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
