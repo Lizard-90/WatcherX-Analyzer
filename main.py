@@ -4,14 +4,12 @@ import os
 import time
 from datetime import datetime, timezone
 import re
+from threading import Event
 
-# Функция для загрузки статьи и добавления текста в файл с идентификаторами
-# Git without articles 2
-def download_article(article_url, article_folder, output_file):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
-    }
+stop_flag = Event()
 
+
+def download_article(article_url, article_folder, output_file, stop_flag):
     try:
         response = requests.get(article_url, headers=headers)
         response.raise_for_status()  # Проверка на ошибки HTTP
@@ -32,8 +30,18 @@ def download_article(article_url, article_folder, output_file):
             article_text = "\n".join([p.get_text() for p in soup.find_all('p')])
 
             # Очищаем текст от лишних пробелов и отступов с помощью регулярных выражений
-            article_text = re.sub(r'\s+', ' ', article_text)  # Заменяем последовательности пробелов и символов табуляции на один пробел
+            article_text = re.sub(r'\s+', ' ',
+                                  article_text)  # Заменяем последовательности пробелов и символов табуляции на один пробел
             article_text = article_text.strip()  # Удаляем пробелы и отступы в начале и конце
+
+            # Проверяем, если статья старше указанного максимального возраста
+            current_time = datetime.now(timezone.utc)
+            time_difference = current_time - date_published
+
+            if time_difference.total_seconds() > max_age_hours * 3600:
+                print(f"Статья {article_url} была опубликована более чем {max_age_hours} часов назад. Пропускаем.")
+                stop_flag.set()  # Устанавливаем флаг остановки парсинга
+                return False
 
             # Открываем файл в режиме "дополнение" и записываем новую статью
             with open(os.path.join(article_folder, output_file), 'a', encoding='utf-8') as file:
@@ -43,6 +51,7 @@ def download_article(article_url, article_folder, output_file):
                 # Записываем начало статьи и текст
                 file.write(f"Начало статьи ({article_id}):\n")
                 file.write(article_text + '\n')
+                file.write("----------------------------\n")
 
             return True
         else:
@@ -68,6 +77,12 @@ os.makedirs(article_folder, exist_ok=True)
 # Список для хранения загруженных дат
 downloaded_dates = []
 
+# Интервал времени в часах между сканированиями
+interval_hours = 1
+
+#Актуальность статьи в часах
+max_age_hours = 12
+
 # Отправляем GET-запрос и получаем содержимое страницы
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
@@ -84,11 +99,13 @@ while True:
 
             for meta_element in meta_elements:
                 article_url = meta_element['content']
-                download_article(article_url, article_folder, output_file)
-                # Добавьте задержку между запросами, например, 1 секунда
-                time.sleep(1)
+                if not download_article(article_url, article_folder, output_file, Event()):
+                    print("Остановка парсинга старых статей.")
+                    break  # Если download_article возвращает False, прерываем обработку текущей статьи
+
+            # Спим в течение указанного интервала времени
+            time.sleep(interval_hours * 3600)  # Переводим часы в секунды
         else:
             print("Не удалось получить доступ к странице с новостями.")
     except requests.exceptions.RequestException as e:
         print(f"Произошла ошибка при запросе: {e}")
-    time.sleep(360)  # Пауза в 6 минут (360 секунд)
